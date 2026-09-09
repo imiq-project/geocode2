@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Geocoder Test</title>
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    crossorigin=""
+  />
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      font-family: system-ui, sans-serif;
+    }
+
+    .app {
+      display: flex;
+      height: 100vh;
+    }
+
+    #map {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .sidebar {
+      width: 380px;
+      padding: 16px;
+      background: #fff;
+      border-left: 1px solid #ddd;
+      overflow-y: auto;
+      z-index: 1000;
+    }
+
+    h1 {
+      margin: 0 0 16px;
+      font-size: 20px;
+    }
+
+    .search {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      padding: 10px 12px;
+      border: 1px solid #bbb;
+      border-radius: 6px;
+      font-size: 15px;
+    }
+
+    button {
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 6px;
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
+    .status {
+      margin: 8px 0 14px;
+      color: #666;
+      font-size: 13px;
+    }
+
+    .error {
+      padding: 10px;
+      margin-bottom: 12px;
+      background: #fee2e2;
+      color: #991b1b;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .result {
+      padding: 12px;
+      margin-bottom: 8px;
+      border: 1px solid #ddd;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .result:hover {
+      background: #f5f7fa;
+    }
+
+    .result-name {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .result-meta {
+      color: #666;
+      font-size: 12px;
+    }
+
+    .result-coords {
+      margin-top: 5px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #888;
+    }
+
+    @media (max-width: 700px) {
+      .app {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        width: 100%;
+        height: 45%;
+        order: 2;
+        border-left: 0;
+        border-top: 1px solid #ddd;
+      }
+
+      #map {
+        height: 55%;
+        flex: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <div id="map"></div>
+
+    <aside class="sidebar">
+      <h1>Geocoder Test</h1>
+
+      <div class="search">
+        <input
+          id="query"
+          type="search"
+          value="Bibliothek"
+          placeholder="Search..."
+          autocomplete="off"
+        >
+        <button id="searchButton">Search</button>
+      </div>
+
+      <div id="status" class="status">
+        Enter a query and search.
+      </div>
+
+      <div id="error"></div>
+      <div id="results"></div>
+    </aside>
+  </div>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    crossorigin=""
+  ></script>
+
+  <script>
+    // Your geocoder endpoint.
+    const GEOCODER_URL = "http://localhost:8080/v1/search";
+
+    // Start somewhere useful; change this if desired.
+    const map = L.map("map").setView([52.13, 11.62], 12);
+
+    L.tileLayer(
+        "https://sgx.geodatenzentrum.de/wmts_basemapde/tile/1.0.0/de_basemapde_web_raster_farbe/default/GLOBAL_WEBMERCATOR/{z}/{y}/{x}.png",
+        {
+        minZoom: 0,
+        maxZoom: 18,
+        attribution: "© basemap.de / BKG | Datenquellen: © GeoBasis-DE"
+        }
+    ).addTo(map);
+
+    const markers = L.layerGroup().addTo(map);
+
+    const queryInput = document.getElementById("query");
+    const searchButton = document.getElementById("searchButton");
+    const resultsElement = document.getElementById("results");
+    const statusElement = document.getElementById("status");
+    const errorElement = document.getElementById("error");
+
+    async function search() {
+      const query = queryInput.value.trim();
+
+      if (!query) {
+        statusElement.textContent = "Please enter a search query.";
+        return;
+      }
+
+      searchButton.disabled = true;
+      statusElement.textContent = "Searching...";
+      errorElement.innerHTML = "";
+      resultsElement.innerHTML = "";
+      markers.clearLayers();
+
+      const url = new URL(GEOCODER_URL);
+      url.searchParams.set("limit", "20");
+      url.searchParams.set("q", query);
+
+      try {
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          throw new Error(
+            `HTTP ${response.status}: ${response.statusText}`
+          );
+        }
+
+        const data = await response.json();
+        const results = Array.isArray(data.results) ? data.results : [];
+
+        statusElement.textContent =
+          `${results.length} result${results.length === 1 ? "" : "s"}`;
+
+        if (results.length === 0) {
+          resultsElement.innerHTML =
+            "<p>No results found.</p>";
+          return;
+        }
+
+        const bounds = [];
+
+        results.forEach((result, index) => {
+          const lat = Number(result.lat);
+          const lon = Number(result.lon);
+
+          if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+            return;
+          }
+
+          bounds.push([lat, lon]);
+
+          const marker = L.marker([lat, lon])
+            .addTo(markers)
+            .bindPopup(`
+              <strong>${escapeHtml(result.name ?? "Unnamed")}</strong><br>
+              ${escapeHtml(result.type ?? "")}<br>
+              <small>ID: ${escapeHtml(String(result.id ?? ""))}</small>
+            `);
+
+          const item = document.createElement("div");
+          item.className = "result";
+
+          item.innerHTML = `
+            <div class="result-name">
+              ${escapeHtml(result.name ?? "Unnamed")}
+            </div>
+            <div class="result-meta">
+              ${escapeHtml(result.type ?? "unknown")} ·
+              ID ${escapeHtml(String(result.id ?? ""))}
+            </div>
+            <div class="result-coords">
+              ${lat.toFixed(6)}, ${lon.toFixed(6)}
+            </div>
+          `;
+
+          item.addEventListener("click", () => {
+            map.setView([lat, lon], 17);
+            marker.openPopup();
+          });
+
+          resultsElement.appendChild(item);
+        });
+
+        if (bounds.length > 0) {
+          map.fitBounds(bounds, {
+            padding: [40, 40],
+            maxZoom: 16
+          });
+        }
+
+      } catch (error) {
+        console.error(error);
+
+        statusElement.textContent = "Search failed.";
+
+        errorElement.innerHTML = `
+          <div class="error">
+            <strong>Error:</strong><br>
+            ${escapeHtml(error.message)}
+            <br><br>
+            If this page is not served from
+            <code>localhost:8080</code>, make sure your geocoder
+            allows CORS requests.
+          </div>
+        `;
+      } finally {
+        searchButton.disabled = false;
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    searchButton.addEventListener("click", search);
+
+    queryInput.addEventListener("keydown", event => {
+      if (event.key === "Enter") {
+        search();
+      }
+    });
+
+    // Run the initial example search.
+    search();
+  </script>
+</body>
+</html>

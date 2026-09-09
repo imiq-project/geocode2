@@ -1,0 +1,14 @@
+services:
+  postgres:
+    build: db
+    environment:
+      POSTGRES_DB: geocoder
+      POSTGRES_USER: geocoder
+      POSTGRES_PASSWORD: geocoder
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres:/var/lib/postgresql/data
+
+volumes:
+  postgres:

@@ -1,0 +1,194 @@
+package db
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"example.com/geocoder/internal/model"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+func DeletePlaces(ctx context.Context, pool *pgxpool.Pool) error {
+	_, err := pool.Exec(ctx, `DELETE FROM places`)
+	return err
+}
+
+func CopyPlaces(ctx context.Context, pool *pgxpool.Pool, places []model.Place) error {
+	if len(places) == 0 {
+		return nil
+	}
+
+	// COPY goes through a staging table so geometry can be built by PostgreSQL.
+	_, err := pool.Exec(ctx, `
+        CREATE TEMP TABLE IF NOT EXISTS places_stage (
+            osm_type text, osm_id bigint, name text, normalized_name text,
+            house_number text, street text, postcode text, city text, district text,
+            country text, country_code text, place_type text,
+            lat double precision, lon double precision,
+            importance real, population bigint, search_text text
+        )`) // TODO: ON COMMIT DROP
+	if err != nil {
+		return err
+	}
+
+	rows := make([][]any, 0, len(places))
+	for _, p := range places {
+		rows = append(rows, []any{
+			p.OSMType, p.OSMID, p.Name, p.Normalized,
+			p.HouseNumber, p.Street, p.Postcode, p.City, p.District,
+			p.Country, p.CountryCode, p.PlaceType,
+			p.Lat, p.Lon, p.Importance, p.Population, p.SearchText,
+		})
+	}
+
+	_, err = pool.CopyFrom(ctx, pgx.Identifier{"places_stage"},
+		[]string{
+			"osm_type", "osm_id", "name", "normalized_name",
+			"house_number", "street", "postcode", "city", "district",
+			"country", "country_code", "place_type", "lat", "lon",
+			"importance", "population", "search_text",
+		},
+		pgx.CopyFromRows(rows))
+	if err != nil {
+		return err
+	}
+
+	_, err = pool.Exec(ctx, `
+        INSERT INTO places (
+            osm_type, osm_id, name, normalized_name, house_number, street,
+            postcode, city, district, country, country_code, place_type,
+            geom, importance, population, search_text
+        )
+        SELECT
+            osm_type, osm_id, name, normalized_name, house_number, street,
+            postcode, city, district, country, country_code, place_type,
+            ST_SetSRID(ST_MakePoint(lon, lat), 4326),
+            importance, population, search_text
+        FROM places_stage
+        ON CONFLICT (osm_type, osm_id) DO UPDATE SET
+            name = EXCLUDED.name,
+            normalized_name = EXCLUDED.normalized_name,
+            house_number = EXCLUDED.house_number,
+            street = EXCLUDED.street,
+            postcode = EXCLUDED.postcode,
+            city = EXCLUDED.city,
+            district = EXCLUDED.district,
+            country = EXCLUDED.country,
+            country_code = EXCLUDED.country_code,
+            place_type = EXCLUDED.place_type,
+            geom = EXCLUDED.geom,
+            importance = EXCLUDED.importance,
+            population = EXCLUDED.population,
+            search_text = EXCLUDED.search_text`)
+	return err
+}
+
+func Search(ctx context.Context, pool *pgxpool.Pool, q string, bbox *[4]float64, lat, lon *float64, radius float64, limit int) ([]model.Result, error) {
+	args := []any{q}
+	where := []string{"(normalized_name % $1 OR to_tsvector('simple', search_text) @@ plainto_tsquery('simple', $1))"}
+	n := 2
+
+	if bbox != nil {
+		where = append(where, fmt.Sprintf(
+			"geom && ST_MakeEnvelope($%d,$%d,$%d,$%d,4326)", n, n+1, n+2, n+3))
+		args = append(args, bbox[0], bbox[1], bbox[2], bbox[3])
+		n += 4
+	}
+
+	distanceSQL := "0::double precision"
+	if lat != nil && lon != nil {
+		args = append(args, *lon, *lat)
+		distanceSQL = fmt.Sprintf(
+			"ST_Distance(geom::geography, ST_SetSRID(ST_MakePoint($%d,$%d),4326)::geography)",
+			n, n+1)
+		n += 2
+		if radius > 0 {
+			args = append(args, radius)
+			where = append(where, fmt.Sprintf(
+				"ST_DWithin(geom::geography, ST_SetSRID(ST_MakePoint($%d,$%d),4326)::geography,$%d)",
+				n-2, n-1, n))
+			n++
+		}
+	}
+
+	args = append(args, limit)
+	sql := fmt.Sprintf(`
+		SELECT id,name,place_type,ST_Y(geom),ST_X(geom),%s AS distance,
+			house_number,street,postcode,city,district,country,country_code
+		FROM places
+		WHERE %s
+		ORDER BY similarity(normalized_name,$1) DESC, importance DESC, distance
+		LIMIT $%d`,
+		distanceSQL,
+		strings.Join(where, " AND "),
+		n,
+	)
+
+	rows, err := pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []model.Result
+	for rows.Next() {
+		var r model.Result
+		if err := rows.Scan(&r.ID, &r.Name, &r.Type, &r.Lat, &r.Lon, &r.DistanceM,
+			&r.HouseNumber, &r.Street, &r.Postcode, &r.City, &r.District,
+			&r.Country, &r.CountryCode); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+func Reverse(ctx context.Context, pool *pgxpool.Pool, lat, lon, radius float64) (*model.Result, error) {
+	row := pool.QueryRow(ctx, `
+        SELECT id,name,place_type,ST_Y(geom),ST_X(geom),
+               ST_Distance(geom::geography, p::geography),
+               house_number,street,postcode,city,district,country,country_code
+        FROM places
+        CROSS JOIN LATERAL ST_SetSRID(ST_MakePoint($1,$2),4326) p
+        WHERE ST_DWithin(geom::geography,p::geography,$3)
+        ORDER BY geom <-> p
+        LIMIT 1`, lon, lat, radius)
+
+	var r model.Result
+	err := row.Scan(&r.ID, &r.Name, &r.Type, &r.Lat, &r.Lon, &r.DistanceM,
+		&r.HouseNumber, &r.Street, &r.Postcode, &r.City, &r.District,
+		&r.Country, &r.CountryCode)
+	return &r, err
+}
+
+func Autocomplete(ctx context.Context, pool *pgxpool.Pool, q string, limit int) ([]model.Result, error) {
+	rows, err := pool.Query(ctx, `
+        SELECT id,name,place_type,ST_Y(geom),ST_X(geom),
+               house_number,street,postcode,city,district,country,country_code
+        FROM places
+        WHERE normalized_name LIKE $1 || '%'
+           OR normalized_name % $1
+        ORDER BY
+            CASE WHEN normalized_name LIKE $1 || '%' THEN 0 ELSE 1 END,
+            similarity(normalized_name,$1) DESC,
+            importance DESC
+        LIMIT $2`, strings.ToLower(strings.TrimSpace(q)), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []model.Result
+	for rows.Next() {
+		var r model.Result
+		if err := rows.Scan(&r.ID, &r.Name, &r.Type, &r.Lat, &r.Lon,
+			&r.HouseNumber, &r.Street, &r.Postcode, &r.City, &r.District,
+			&r.Country, &r.CountryCode); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
