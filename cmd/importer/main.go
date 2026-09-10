@@ -107,23 +107,18 @@ func placeFromOSM(obj osm.Object) (model.Place, bool) {
 
 	ptype := tags.Find("place")
 	if ptype == "" {
-		switch {
-		case tags.Find("amenity") != "":
-			ptype = "amenity"
-		case tags.Find("shop") != "":
-			ptype = "shop"
-		case tags.Find("tourism") != "":
-			ptype = "tourism"
-		case tags.Find("railway") != "":
-			ptype = "railway"
-		case tags.Find("highway") != "":
-			ptype = "highway"
-		default:
-			if tags.Find("addr:housenumber") == "" && tags.Find("addr:street") == "" {
-				return model.Place{}, false
+		for _, key := range []string{"amenity", "shop", "tourism", "railway", "highway"} {
+			if ptype = tags.Find(key); ptype != "" {
+				break
 			}
-			ptype = "address"
 		}
+	}
+
+	if ptype == "" {
+		if tags.Find("addr:housenumber") == "" && tags.Find("addr:street") == "" {
+			return model.Place{}, false
+		}
+		ptype = "address"
 	}
 
 	var population *int64
@@ -152,7 +147,7 @@ func placeFromOSM(obj osm.Object) (model.Place, bool) {
 		Population:  population,
 	}
 	p.SearchText = normalize.SearchText(
-		p.Name, p.HouseNumber, p.Street, p.Postcode,
+		p.Name, p.PlaceType, p.HouseNumber, p.Street, p.Postcode,
 		p.City, p.District, p.Country,
 	)
 	return p, true

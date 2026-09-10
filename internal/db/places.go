@@ -87,7 +87,7 @@ func CopyPlaces(ctx context.Context, pool *pgxpool.Pool, places []model.Place) e
 
 func Search(ctx context.Context, pool *pgxpool.Pool, q string, bbox *[4]float64, lat, lon *float64, radius float64, limit int) ([]model.Result, error) {
 	args := []any{q}
-	where := []string{"(normalized_name % $1 OR to_tsvector('simple', search_text) @@ plainto_tsquery('simple', $1))"}
+	where := []string{"(search_text % $1 OR to_tsvector('simple', search_text) @@ plainto_tsquery('simple', $1))"}
 	n := 2
 
 	if bbox != nil {
@@ -119,7 +119,7 @@ func Search(ctx context.Context, pool *pgxpool.Pool, q string, bbox *[4]float64,
 			house_number,street,postcode,city,district,country,country_code
 		FROM places
 		WHERE %s
-		ORDER BY similarity(normalized_name,$1) DESC, importance DESC, distance
+		ORDER BY similarity(search_text,$1) DESC, distance
 		LIMIT $%d`,
 		distanceSQL,
 		strings.Join(where, " AND "),
