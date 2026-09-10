@@ -143,7 +143,6 @@ func placeFromOSM(obj osm.Object) (model.Place, bool) {
 		PlaceType:   ptype,
 		Lat:         lat,
 		Lon:         lon,
-		Importance:  importance(ptype),
 		Population:  population,
 	}
 	p.SearchText = normalize.SearchText(
@@ -161,23 +160,6 @@ func first(a, b, c string) string {
 		return b
 	}
 	return c
-}
-
-func importance(t string) float32 {
-	switch t {
-	case "city":
-		return 1
-	case "town":
-		return 0.8
-	case "village":
-		return 0.6
-	case "suburb":
-		return 0.5
-	case "station":
-		return 0.5
-	default:
-		return 0.2
-	}
 }
 
 func point(obj osm.Object) (float64, float64, bool) {

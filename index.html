@@ -157,7 +157,7 @@
         <input
           id="query"
           type="search"
-          value="Bibliothek"
+          value="Supermarkt"
           placeholder="Search..."
           autocomplete="off"
         >
@@ -217,8 +217,11 @@
       markers.clearLayers();
 
       const url = new URL(GEOCODER_URL);
-      url.searchParams.set("limit", "20");
+      const center = map.getCenter()
+      url.searchParams.set("limit", "50");
       url.searchParams.set("q", query);
+      url.searchParams.set("lat", center.lat);
+      url.searchParams.set("lon", center.lng);
 
       try {
         const response = await fetch(url);

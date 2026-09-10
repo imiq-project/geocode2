@@ -15,7 +15,6 @@ type Place struct {
 	PlaceType   string
 	Lat         float64
 	Lon         float64
-	Importance  float32
 	Population  *int64
 	SearchText  string
 }

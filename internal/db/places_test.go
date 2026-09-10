@@ -27,11 +27,11 @@ func TestDeletePlacesRemovesAllRows(t *testing.T) {
 		INSERT INTO places (
 			osm_type, osm_id, name, normalized_name, house_number, street,
 			postcode, city, district, country, country_code, place_type,
-			geom, importance, population, search_text
+			geom, population, search_text
 		)
 		VALUES (
 			'N', 1, 'Test Place', 'test place', '', '', '', '', '', '', '', 'place',
-			ST_SetSRID(ST_MakePoint(13.4, 52.1), 4326), 1.0, NULL, 'test place'
+			ST_SetSRID(ST_MakePoint(13.4, 52.1), 4326), NULL, 'test place'
 		)`); err != nil {
 		t.Fatal(err)
 	}

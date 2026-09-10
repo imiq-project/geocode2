@@ -27,7 +27,7 @@ func CopyPlaces(ctx context.Context, pool *pgxpool.Pool, places []model.Place) e
             house_number text, street text, postcode text, city text, district text,
             country text, country_code text, place_type text,
             lat double precision, lon double precision,
-            importance real, population bigint, search_text text
+            population bigint, search_text text
         )`) // TODO: ON COMMIT DROP
 	if err != nil {
 		return err
@@ -39,7 +39,7 @@ func CopyPlaces(ctx context.Context, pool *pgxpool.Pool, places []model.Place) e
 			p.OSMType, p.OSMID, p.Name, p.Normalized,
 			p.HouseNumber, p.Street, p.Postcode, p.City, p.District,
 			p.Country, p.CountryCode, p.PlaceType,
-			p.Lat, p.Lon, p.Importance, p.Population, p.SearchText,
+			p.Lat, p.Lon, p.Population, p.SearchText,
 		})
 	}
 
@@ -48,7 +48,7 @@ func CopyPlaces(ctx context.Context, pool *pgxpool.Pool, places []model.Place) e
 			"osm_type", "osm_id", "name", "normalized_name",
 			"house_number", "street", "postcode", "city", "district",
 			"country", "country_code", "place_type", "lat", "lon",
-			"importance", "population", "search_text",
+			"population", "search_text",
 		},
 		pgx.CopyFromRows(rows))
 	if err != nil {
@@ -59,13 +59,13 @@ func CopyPlaces(ctx context.Context, pool *pgxpool.Pool, places []model.Place) e
         INSERT INTO places (
             osm_type, osm_id, name, normalized_name, house_number, street,
             postcode, city, district, country, country_code, place_type,
-            geom, importance, population, search_text
+            geom, population, search_text
         )
         SELECT
             osm_type, osm_id, name, normalized_name, house_number, street,
             postcode, city, district, country, country_code, place_type,
             ST_SetSRID(ST_MakePoint(lon, lat), 4326),
-            importance, population, search_text
+        	population, search_text
         FROM places_stage
         ON CONFLICT (osm_type, osm_id) DO UPDATE SET
             name = EXCLUDED.name,
@@ -79,7 +79,6 @@ func CopyPlaces(ctx context.Context, pool *pgxpool.Pool, places []model.Place) e
             country_code = EXCLUDED.country_code,
             place_type = EXCLUDED.place_type,
             geom = EXCLUDED.geom,
-            importance = EXCLUDED.importance,
             population = EXCLUDED.population,
             search_text = EXCLUDED.search_text`)
 	return err
@@ -87,7 +86,7 @@ func CopyPlaces(ctx context.Context, pool *pgxpool.Pool, places []model.Place) e
 
 func Search(ctx context.Context, pool *pgxpool.Pool, q string, bbox *[4]float64, lat, lon *float64, radius float64, limit int) ([]model.Result, error) {
 	args := []any{q}
-	where := []string{"(search_text % $1 OR to_tsvector('simple', search_text) @@ plainto_tsquery('simple', $1))"}
+	where := []string{"(normalized_name % $1 OR place_type % $1 OR to_tsvector('simple', search_text) @@ plainto_tsquery('simple', $1))"}
 	n := 2
 
 	if bbox != nil {
@@ -172,8 +171,7 @@ func Autocomplete(ctx context.Context, pool *pgxpool.Pool, q string, limit int) 
            OR normalized_name % $1
         ORDER BY
             CASE WHEN normalized_name LIKE $1 || '%' THEN 0 ELSE 1 END,
-            similarity(normalized_name,$1) DESC,
-            importance DESC
+            similarity(normalized_name,$1) DESC
         LIMIT $2`, strings.ToLower(strings.TrimSpace(q)), limit)
 	if err != nil {
 		return nil, err
