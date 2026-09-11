@@ -17,8 +17,9 @@ import (
 )
 
 type API struct {
-	DB            *pgxpool.Pool
-	EmbeddingsURL string
+	DB                  *pgxpool.Pool
+	EmbeddingsURL       string
+	SimilarityThreshold float64
 }
 
 func (a *API) Routes() http.Handler {
@@ -177,6 +178,7 @@ func (a *API) search(w http.ResponseWriter, r *http.Request) {
 		lon,
 		radius,
 		limit,
+		a.SimilarityThreshold,
 	)
 	if err != nil {
 		log.Println(err)

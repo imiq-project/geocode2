@@ -91,13 +91,13 @@ func Search(
 	lat, lon *float64,
 	radius float64,
 	limit int,
+	vectorThreshold float64,
 ) ([]model.Result, error) {
 	if limit <= 0 {
 		return nil, nil
 	}
 
 	var results []model.Result
-	vectorThreshold := .3
 
 	// ---------------------------------------------------------------
 	// 1. Vector search

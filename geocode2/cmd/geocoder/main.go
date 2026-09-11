@@ -5,6 +5,8 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"os"
+	"strconv"
 
 	"imiq/geocode2/internal/api"
 	"imiq/geocode2/internal/db"
@@ -16,13 +18,25 @@ func main() {
 	listen := flag.String("listen", ":8080", "listen address")
 	flag.Parse()
 
+	thresholdString := os.Getenv("SIMILARITY_THRESHOLD")
+	if thresholdString == "" {
+		thresholdString = ".25"
+	}
+	threshold, err := strconv.ParseFloat(thresholdString, 64)
+	if err != nil {
+		log.Fatal("Invalid SIMILARITY_THRESHOLD:", err)
+	}
+	if threshold < 0 || threshold > 1 {
+		log.Fatal("SIMILARITY_THRESHOLD must be between 0 and 1")
+	}
+
 	pool, err := db.Open(context.Background(), *database)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer pool.Close()
 
-	handler := cors((&api.API{DB: pool, EmbeddingsURL: *embeddingsURL}).Routes())
+	handler := cors((&api.API{DB: pool, EmbeddingsURL: *embeddingsURL, SimilarityThreshold: threshold}).Routes())
 
 	log.Printf("listening on %s", *listen)
 	log.Fatal(http.ListenAndServe(*listen, handler))
