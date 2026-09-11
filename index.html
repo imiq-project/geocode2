@@ -180,7 +180,7 @@
 
   <script>
     // Your geocoder endpoint.
-    const GEOCODER_URL = "http://localhost:8080/v1/search";
+    const GEOCODER_URL = "http://localhost:8080/geocode";
 
     // Start somewhere useful; change this if desired.
     const map = L.map("map").setView([52.13, 11.62], 12);
@@ -233,7 +233,7 @@
         }
 
         const data = await response.json();
-        const results = Array.isArray(data.results) ? data.results : [];
+        const results = Array.isArray(data) ? data : [];
 
         statusElement.textContent =
           `${results.length} result${results.length === 1 ? "" : "s"}`;

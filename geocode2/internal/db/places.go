@@ -97,7 +97,7 @@ func Search(
 	}
 
 	var results []model.Result
-	vectorThreshold := .2
+	vectorThreshold := .3
 
 	// ---------------------------------------------------------------
 	// 1. Vector search
