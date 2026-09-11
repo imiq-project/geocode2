@@ -8,8 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"example.com/geocoder/internal/db"
-	"example.com/geocoder/internal/embeddings"
+	"imiq/geocode2/internal/db"
+	"imiq/geocode2/internal/embeddings"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

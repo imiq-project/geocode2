@@ -1,4 +1,9 @@
 services:
+  geocode2:
+    build: geocode2
+    ports:
+      - 8080:8080
+    command: geocoder --database postgres://geocoder:geocoder@postgres:5432/geocoder?sslmode=disable
   postgres:
     build: db
     environment:

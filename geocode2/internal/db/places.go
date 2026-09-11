@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"example.com/geocoder/internal/model"
+	"imiq/geocode2/internal/model"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pgvector/pgvector-go"

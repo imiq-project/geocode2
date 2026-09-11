@@ -1,4 +1,4 @@
-module example.com/geocoder
+module imiq/geocode2
 
 go 1.25.0
 

@@ -6,8 +6,8 @@ import (
 	"log"
 	"net/http"
 
-	"example.com/geocoder/internal/api"
-	"example.com/geocoder/internal/db"
+	"imiq/geocode2/internal/api"
+	"imiq/geocode2/internal/db"
 )
 
 func main() {

@@ -10,10 +10,11 @@ import (
 	"strconv"
 	"strings"
 
-	"example.com/geocoder/internal/db"
-	"example.com/geocoder/internal/embeddings"
-	"example.com/geocoder/internal/model"
-	"example.com/geocoder/internal/normalize"
+	"imiq/geocode2/internal/db"
+	"imiq/geocode2/internal/embeddings"
+	"imiq/geocode2/internal/model"
+	"imiq/geocode2/internal/normalize"
+
 	"github.com/paulmach/osm"
 	"github.com/paulmach/osm/osmpbf"
 )
