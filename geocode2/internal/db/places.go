@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"imiq/geocode2/internal/model"
+	"imiq/geocode2/internal/normalize"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -234,6 +235,7 @@ func Search(
 
 	// If enough vector matches passed the threshold, we're done.
 	if len(results) >= limit {
+		fillDisplayNames(results[:limit])
 		return results[:limit], nil
 	}
 
@@ -381,7 +383,22 @@ func Search(
 		return nil, err
 	}
 
+	fillDisplayNames(results)
 	return results, nil
+}
+
+func fillDisplayNames(results []model.Result) {
+	for idx, place := range results {
+		parts := []string{
+			place.Name,
+			fmt.Sprintf("%s %s", place.Street, place.HouseNumber),
+			place.District,
+			place.City,
+			fmt.Sprintf("%s %s", place.Postcode, place.City),
+		}
+		parts = normalize.RemoveEmptyStrings(parts)
+		results[idx].DisplayName = strings.Join(parts, ",")
+	}
 }
 
 func SimpleSearch(ctx context.Context, pool *pgxpool.Pool, q string, queryEmbedding []float64, bbox *[4]float64, lat, lon *float64, radius float64, limit int) ([]model.Result, error) {

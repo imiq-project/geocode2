@@ -20,17 +20,18 @@ type Place struct {
 }
 
 type Result struct {
-	ID          int64   `json:"id"`
-	Name        string  `json:"name,omitempty"`
+	ID          int64   `json:"osm_id"`
+	Name        string  `json:"name"`
+	DisplayName string  `json:"display_name"`
 	Type        string  `json:"type"`
 	Lat         float64 `json:"lat"`
 	Lon         float64 `json:"lon"`
-	DistanceM   float64 `json:"distance_m,omitempty"`
-	HouseNumber string  `json:"house_number,omitempty"`
-	Street      string  `json:"street,omitempty"`
-	Postcode    string  `json:"postcode,omitempty"`
-	City        string  `json:"city,omitempty"`
-	District    string  `json:"district,omitempty"`
-	Country     string  `json:"country,omitempty"`
-	CountryCode string  `json:"country_code,omitempty"`
+	DistanceM   float64 `json:"distance_m"`
+	HouseNumber string  `json:"housenumber"`
+	Street      string  `json:"street"`
+	Postcode    string  `json:"postcode"`
+	City        string  `json:"city"`
+	District    string  `json:"district"`
+	Country     string  `json:"country"`
+	CountryCode string  `json:"country_code"`
 }
