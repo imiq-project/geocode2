@@ -9,6 +9,12 @@ services:
       - "5432:5432"
     volumes:
       - postgres:/var/lib/postgresql/data
-
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+     - "1434:11434"
+    volumes:
+     - ollama:/root/.ollama
 volumes:
   postgres:
+  ollama:

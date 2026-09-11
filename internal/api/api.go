@@ -9,11 +9,15 @@ import (
 	"strings"
 
 	"example.com/geocoder/internal/db"
+	"example.com/geocoder/internal/embeddings"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type API struct{ DB *pgxpool.Pool }
+type API struct {
+	DB            *pgxpool.Pool
+	EmbeddingsURL string
+}
 
 func (a *API) Routes() http.Handler {
 	mux := http.NewServeMux()
@@ -74,7 +78,14 @@ func (a *API) search(w http.ResponseWriter, r *http.Request) {
 		lat, lon = &la, &lo
 	}
 
-	results, err := db.Search(r.Context(), a.DB, q, bbox, lat, lon, floatParam(r, "radius", 0), limit)
+	queryEmbedding, err := embeddings.GenerateEmbeddings([]string{q}, a.EmbeddingsURL)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "search failed", 500)
+		return
+	}
+
+	results, err := db.Search(r.Context(), a.DB, q, queryEmbedding[0], bbox, lat, lon, floatParam(r, "radius", 0), limit)
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "search failed", 500)

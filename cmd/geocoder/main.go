@@ -12,6 +12,7 @@ import (
 
 func main() {
 	database := flag.String("database", "postgres://geocoder:geocoder@localhost:5432/geocoder?sslmode=disable", "database URL")
+	embeddingsURL := flag.String("embeddings-url", "http://ollama:11434/v1/embeddings", "api endpoint for generating embeddings")
 	listen := flag.String("listen", ":8080", "listen address")
 	flag.Parse()
 
@@ -21,7 +22,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	handler := cors((&api.API{DB: pool}).Routes())
+	handler := cors((&api.API{DB: pool, EmbeddingsURL: *embeddingsURL}).Routes())
 
 	log.Printf("listening on %s", *listen)
 	log.Fatal(http.ListenAndServe(*listen, handler))

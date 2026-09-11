@@ -1,6 +1,9 @@
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+DROP TABLE places;
+
 CREATE TABLE places (
     id              BIGSERIAL PRIMARY KEY,
     osm_type        TEXT NOT NULL,
@@ -16,17 +19,13 @@ CREATE TABLE places (
     country_code    TEXT,
     place_type      TEXT NOT NULL,
     geom            geometry(Point, 4326) NOT NULL,
-    embedding       vector(384),
+    embedding       vector(1024),
     population      BIGINT,
     search_text     TEXT NOT NULL,
     UNIQUE (osm_type, osm_id)
 );
 
-CREATE INDEX IF NOT EXISTS places_geom_gist
-    ON places USING GIST (geom);
-CREATE INDEX IF NOT EXISTS places_name_trgm
-    ON places USING GIN (normalized_name gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS places_search_fts
-    ON places USING GIN (to_tsvector('simple', search_text));
-CREATE INDEX IF NOT EXISTS places_embedding_hnsw
-    ON places USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX places_geom_gist ON places USING GIST (geom);
+CREATE INDEX places_name_trgm ON places USING GIN (normalized_name gin_trgm_ops);
+CREATE INDEX places_search_fts ON places USING GIN (to_tsvector('simple', search_text));
+CREATE INDEX places_embedding_hnsw ON places USING hnsw (embedding vector_cosine_ops);

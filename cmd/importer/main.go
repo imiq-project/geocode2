@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"example.com/geocoder/internal/db"
+	"example.com/geocoder/internal/embeddings"
 	"example.com/geocoder/internal/model"
 	"example.com/geocoder/internal/normalize"
 	"github.com/paulmach/osm"
@@ -22,6 +23,7 @@ func main() {
 	database := flag.String("database", "postgres://geocoder:geocoder@localhost:5432/geocoder?sslmode=disable", "database URL")
 	workers := flag.Int("workers", runtime.NumCPU(), "decoder workers")
 	batchSize := flag.Int("batch-size", 10000, "database batch size")
+	embeddingsURL := flag.String("embeddings-url", "http://ollama:11434/v1/embeddings", "api endpoint for generating embeddings")
 	flag.Parse()
 
 	if *pbf == "" {
@@ -41,10 +43,11 @@ func main() {
 	}
 	defer f.Close()
 
-	err = db.DeletePlaces(ctx, pool)
+	err = db.Create(ctx, pool)
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Println("migration complete")
 
 	scanner := osmpbf.New(ctx, f, *workers)
 	defer scanner.Close()
@@ -78,6 +81,27 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Printf("finished: %d places", count)
+
+	placeTypes, err := db.GetAllPlaceTypes(ctx, pool)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("%d place types", len(placeTypes))
+
+	placeTypeEmbeddings, err := embeddings.GenerateEmbeddings(placeTypes, *embeddingsURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println("embeddings generated")
+	embeddingsByPlaceType := make(map[string][]float64)
+	for idx, placeType := range placeTypes {
+		embeddingsByPlaceType[placeType] = placeTypeEmbeddings[idx]
+	}
+	err = db.UpdateEmbedding(ctx, pool, embeddingsByPlaceType)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Print("embeddings inserted")
 }
 
 func tagsFromObject(obj osm.Object) osm.Tags {
@@ -109,6 +133,7 @@ func placeFromOSM(obj osm.Object) (model.Place, bool) {
 	if ptype == "" {
 		for _, key := range []string{"amenity", "shop", "tourism", "railway", "highway"} {
 			if ptype = tags.Find(key); ptype != "" {
+				ptype = ptype + " " + key
 				break
 			}
 		}
@@ -118,7 +143,6 @@ func placeFromOSM(obj osm.Object) (model.Place, bool) {
 		if tags.Find("addr:housenumber") == "" && tags.Find("addr:street") == "" {
 			return model.Place{}, false
 		}
-		ptype = "address"
 	}
 
 	var population *int64
@@ -187,5 +211,3 @@ func point(obj osm.Object) (float64, float64, bool) {
 		return 0, 0, false
 	}
 }
-
-var _ = fmt.Sprintf
