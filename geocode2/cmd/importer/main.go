@@ -130,19 +130,10 @@ func placeFromOSM(obj osm.Object) (model.Place, bool) {
 		return model.Place{}, false
 	}
 
-	ptype := tags.Find("place")
-	if ptype == "" {
-		for _, key := range []string{"amenity", "shop", "tourism", "railway", "highway"} {
-			if ptype = tags.Find(key); ptype != "" {
-				ptype = ptype + " " + key
-				break
-			}
-		}
-	}
-
-	if ptype == "" {
-		if tags.Find("addr:housenumber") == "" && tags.Find("addr:street") == "" {
-			return model.Place{}, false
+	ptype := ""
+	for _, key := range []string{"amenity", "shop", "tourism", "leisure", "place"} {
+		if ptype = tags.Find(key); ptype != "" {
+			break
 		}
 	}
 

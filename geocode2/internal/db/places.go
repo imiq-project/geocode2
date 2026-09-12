@@ -187,7 +187,7 @@ func Search(
 				country_code
 			FROM places
 			WHERE %s
-			ORDER BY embedding <=> $1
+			ORDER BY (embedding <=> $1), distance
 			LIMIT $%d
 		`,
 			distanceSQL,
