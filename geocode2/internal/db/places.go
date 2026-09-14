@@ -251,6 +251,7 @@ func Search(
 			"to_tsvector('simple', search_text) @@ " +
 			"plainto_tsquery('simple', $1))",
 	}
+	where = append(where, "similarity(normalized_name, $1) > 0.7")
 
 	n := 2
 
@@ -341,7 +342,7 @@ func Search(
 			country_code
 		FROM places
 		WHERE %s
-		ORDER BY similarity(search_text, $1) DESC, distance
+		ORDER BY distance
 		LIMIT $%d
 	`,
 		distanceSQL,
