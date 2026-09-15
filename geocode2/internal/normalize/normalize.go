@@ -37,7 +37,7 @@ func RemoveEmptyStrings(input []string) []string {
 	result := make([]string, 0, len(input))
 
 	for _, s := range input {
-		if s != "" {
+		if strings.TrimSpace(s) != "" {
 			result = append(result, s)
 		}
 	}

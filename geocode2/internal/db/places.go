@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"imiq/geocode2/internal/model"
@@ -251,7 +252,6 @@ func Search(
 			"to_tsvector('simple', search_text) @@ " +
 			"plainto_tsquery('simple', $1))",
 	}
-	where = append(where, "similarity(normalized_name, $1) > 0.7")
 
 	n := 2
 
@@ -342,7 +342,7 @@ func Search(
 			country_code
 		FROM places
 		WHERE %s
-		ORDER BY distance
+		ORDER BY similarity(normalized_name, $1) DESC
 		LIMIT $%d
 	`,
 		distanceSQL,
@@ -389,6 +389,9 @@ func Search(
 }
 
 func fillDisplayNames(results []model.Result) {
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].DistanceM < results[j].DistanceM
+	})
 	for idx, place := range results {
 		parts := []string{
 			place.Name,
@@ -398,7 +401,7 @@ func fillDisplayNames(results []model.Result) {
 			fmt.Sprintf("%s %s", place.Postcode, place.City),
 		}
 		parts = normalize.RemoveEmptyStrings(parts)
-		results[idx].DisplayName = strings.Join(parts, ",")
+		results[idx].DisplayName = strings.Join(parts, ", ")
 	}
 }
 

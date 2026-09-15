@@ -157,7 +157,7 @@
         <input
           id="query"
           type="search"
-          value="Supermarkt"
+          value="förderstedter"
           placeholder="Search..."
           autocomplete="off"
         >
@@ -218,10 +218,18 @@
 
       const url = new URL(GEOCODER_URL);
       const center = map.getCenter()
-      url.searchParams.set("limit", "50");
+      const bbox = map.getBounds();
+      const bboxString = [
+        bbox.getWest(),
+        bbox.getSouth(),
+        bbox.getEast(),
+        bbox.getNorth()
+      ].join(',');
+      url.searchParams.set("limit", 10);
       url.searchParams.set("q", query);
       url.searchParams.set("lat", center.lat);
       url.searchParams.set("lon", center.lng);
+      // url.searchParams.set("bbox", bboxString)
 
       try {
         const response = await fetch(url);
@@ -261,7 +269,7 @@
             .bindPopup(`
               <strong>${escapeHtml(result.name ?? "Unnamed")}</strong><br>
               ${escapeHtml(result.type ?? "")}<br>
-              <small>ID: ${escapeHtml(String(result.id ?? ""))}</small>
+              <small>ID: ${escapeHtml(String(result.osm_id ?? ""))}</small>
             `);
 
           const item = document.createElement("div");
@@ -269,11 +277,11 @@
 
           item.innerHTML = `
             <div class="result-name">
-              ${escapeHtml(result.name ?? "Unnamed")}
+              ${escapeHtml(result.display_name ?? "Unnamed")}
             </div>
             <div class="result-meta">
               ${escapeHtml(result.type ?? "unknown")} ·
-              ID ${escapeHtml(String(result.id ?? ""))}
+              ID ${escapeHtml(String(result.osm_id ?? ""))}
             </div>
             <div class="result-coords">
               ${lat.toFixed(6)}, ${lon.toFixed(6)}
